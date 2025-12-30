@@ -4,6 +4,8 @@ import { getVideo, updateVideo } from "../db/videos";
 import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
+import path from 'node:path';
+import { randomBytes } from "node:crypto";
 
 type Thumbnail = {
   data: ArrayBuffer;
@@ -59,8 +61,9 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
 
   const mediaType = thumbnail.type
   const bufferArray = await thumbnail.arrayBuffer();
-  const bufferString = Buffer.from(bufferArray).toString("base64");
-  const dataUrl = `data:${mediaType};base64,${bufferString}`;
+
+  //const bufferString = Buffer.from(bufferArray).toString("base64");
+  //const dataUrl = `data:${mediaType};base64,${bufferString}`;
 
   const videoMetadata = getVideo(cfg.db,videoId);
   if (videoMetadata?.userID != userID)
@@ -69,10 +72,23 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   }
 
   //videoThumbnails.set(videoId,{data: bufferArray, mediaType:mediaType});
-
   //const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`
 
-  videoMetadata.thumbnailURL = dataUrl;
+  const validMediaTypes = ["image/png","image/jpg"];
+
+  if (!(validMediaTypes.includes(mediaType)))
+  {
+    throw new BadRequestError("Invalid media type");
+  }
+
+  const fileExtension = mediaType.split("/")[1];
+  const randomName = randomBytes(32).toString("base64url");
+  const filePath = path.join(cfg.assetsRoot,(randomName + "." + fileExtension));
+
+  console.log(`Constructed file path is ${filePath}`);
+  await Bun.write(filePath,bufferArray);
+
+  videoMetadata.thumbnailURL = `http://localhost:${cfg.port}/assets/${randomName + "." + fileExtension}`;
   updateVideo(cfg.db,videoMetadata);
 
   return respondWithJSON(200, videoMetadata);
