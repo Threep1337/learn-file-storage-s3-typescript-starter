@@ -66,31 +66,15 @@ export async function handlerUploadVideo(cfg: ApiConfig, req: BunRequest) {
     type: mediaType
   }));
 
-  videoMetadata.videoURL = `${aspectRatio + "/" + randomName + "." + fileExtension}`;
+  videoMetadata.videoURL = `${cfg.s3CfDistribution + aspectRatio + "/" + randomName + "." + fileExtension}`;
   updateVideo(cfg.db, videoMetadata);
   await Promise.all([rm(filePath, { force: true }),rm(processedVideoPath, { force: true })]);
 
-  const signedVideo = dbVideoToSignedVideo(cfg,videoMetadata);
-  return respondWithJSON(200, signedVideo);
+  return respondWithJSON(200, videoMetadata);
 }
 
-export function generatePresignedURL(cfg: ApiConfig, key: string, expireTime: number) 
-{
-  return cfg.s3Client.presign(key,{
-      expiresIn: expireTime 
-    });
-}
 
-export function dbVideoToSignedVideo(cfg: ApiConfig, video: Video){
 
-  if (!video.videoURL)
-  {
-    return video;
-  }
-  const signedUrl = generatePresignedURL(cfg, video.videoURL,3600)
-  video.videoURL = signedUrl;
-  return video;
-}
 
 export async function getVideoAspectRatio(filePath:string): Promise<string> {
   //ffprobe -v error -print_format json -show_streams PATH_TO_VIDEO
